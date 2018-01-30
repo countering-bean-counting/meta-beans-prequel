@@ -11,6 +11,7 @@ params:
 ```{r includes}
 library(dplyr)
 library(ggplot2)
+library(ggthemes)
 library(gh)
 library(httr)
 library(jsonlite)
@@ -38,7 +39,7 @@ get_gh_commits <- function (url, query) {
 }
 ```
 
-```{r search_gh_commits}
+```{r search_gh_commits, eval=FALSE}
 commits_search_url <- "https://api.github.com/search/commits"
 commits_search_query <- "q=ibm.com+author-date:>2018-01-01"
 url <- paste(commits_search_url, commits_search_query, sep="?")
@@ -56,5 +57,65 @@ for (n in 2:total_pages) {
 
 saveRDS(commits, "data/ibm_commits.rds")
 ```
+
+```{r repo_summary}
+
+ibm_commits <- readRDS("data/ibm_commits.rds")
+
+ibm_commits <- ibm_commits %>%
+  filter(! is.na(total_count)) %>%
+  rename(repo=items.repository.name,
+         org=items.repository.owner.login) %>%
+  select(repo, org, 
+         items.sha, 
+         items.commit.message, items.commit.author.date, items.commit.author.email, items.commit.author.name,
+         items.commit.committer.date, items.commit.committer.email, items.commit.committer.name,
+         items.author.login, items.committer.login,
+         items.repository.full_name, items.repository.description) %>%
+  mutate(
+    is_committer=items.author.login==items.committer.login
+  )
+
+ibm_commits_repos <- ibm_commits %>%
+  group_by(repo) %>%
+  summarise(
+    org=first(org),
+    total_commits = n(),
+    num_authors = n_distinct(items.author.login),
+    num_committers = sum(is_committer),
+    pct_committers = num_committers/num_authors)
+
+ibm_commits_orgs <- ibm_commits %>%
+  group_by(org) %>%
+  summarise( 
+    total_commits = n(),
+    num_repos = n_distinct(repo),
+    num_authors = n_distinct(items.author.login),
+    num_committers = sum(is_committer),
+    pct_committers = num_committers/num_authors)
+
+```
+
+```{r org_plot, fig.width=8, fig.height=20}
+
+ggplot(ibm_commits_orgs, aes(x=reorder(org, num_authors), y=num_authors)) +
+  geom_bar(stat="identity") +
+  coord_flip() +
+  theme_few() +
+  labs(x="Repository Owner", y="Unique Authors", title="January 2018 - Est. IBM Authors")
+
+ggsave("png/20180101_est_ibm_authors.png")
+
+ggplot(ibm_commits_orgs, aes(x=reorder(org, total_commits), y=total_commits)) +
+  geom_bar(stat="identity") +
+  coord_flip() +
+  theme_few() +
+  labs(x="Repository Owner", y="Commits", title="January 2018 - Est. IBM Commits")
+
+ggsave("png/20180101_est_ibm_commits.png")
+
+```
+
+
 
 
