@@ -58,7 +58,7 @@ for (n in 2:total_pages) {
 saveRDS(commits, "data/ibm_commits.rds")
 ```
 
-```{r repo_summary}
+```{r ibm_commits}
 
 ibm_commits <- readRDS("data/ibm_commits.rds")
 
@@ -75,6 +75,11 @@ ibm_commits <- ibm_commits %>%
   mutate(
     is_committer=items.author.login==items.committer.login
   )
+
+```
+
+
+```{r repo_summary}
 
 ibm_commits_repos <- ibm_commits %>%
   group_by(repo) %>%
@@ -96,6 +101,31 @@ ibm_commits_orgs <- ibm_commits %>%
   mutate(
     is_ibm = str_detect(org, "[Ii][Bb][Mm]")
   )
+
+```
+
+
+```{r author_check, message=FALSE}
+
+ibm_commits_author_check <- ibm_commits %>%
+  filter(str_detect(items.commit.author.email, "ibm")) %>%
+  group_by(org) %>%
+  summarise(
+    num_authors_ibm_check = n_distinct(items.author.login)
+  )
+
+ibm_commits_author_check_join <- ibm_commits_author_check %>% full_join(ibm_commits_orgs %>% select(org, num_authors))
+
+ibm_commits_author_check_join <- ibm_commits_author_check_join %>% 
+  mutate(author_diff=num_authors-num_authors_ibm_check)
+
+ggplot(ibm_commits_author_check_join %>% filter(author_diff > 0), aes(x=reorder(org, author_diff), y=author_diff)) +
+  geom_bar(stat="identity") +
+  coord_flip() +
+  theme_few() +
+  labs(x="Repository Owner", y="Unique Authors - Authors w/ IBM in email", title="January 2018 - IBM Unique Authors Check")
+
+ggsave("png/20180101_ibm_author_check.png")
 
 ```
 
