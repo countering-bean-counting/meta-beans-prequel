@@ -99,6 +99,17 @@ ibm_commits_orgs <- ibm_commits %>%
 
 ```
 
+```{r org_sums}
+
+total_commits <- ibm_commits_orgs %>% filter(!is_ibm) %>% summarise(sum(total_commits))
+paste("Jan 2018: Total (rough est.) Commits of non-ibm Repos (by repo owner):", total_commits)
+
+total_authors <- ibm_commits_orgs %>% filter(!is_ibm) %>% summarise(sum(num_authors))
+paste("Jan 2018: Total (rough est.) Unique Authors per non-ibm Repo (by repo owner):", total_authors)
+
+
+```
+
 ```{r org_plot, fig.width=8, fig.height=20}
 
 ggplot(ibm_commits_orgs, aes(x=reorder(org, num_authors), y=num_authors, fill=is_ibm)) +
