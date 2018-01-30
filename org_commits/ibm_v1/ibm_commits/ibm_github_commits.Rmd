@@ -73,8 +73,25 @@ ibm_commits <- ibm_commits %>%
          items.author.login, items.committer.login,
          items.repository.full_name, items.repository.description) %>%
   mutate(
-    is_committer=items.author.login==items.committer.login
+    is_committer=items.author.login==items.committer.login,
+    is_ibm = str_detect(org, "[Ii][Bb][Mm]")
   )
+
+```
+
+```{r commits_sums}
+
+total_commits <- ibm_commits %>% filter(!is_ibm) %>% summarise(n())
+paste("Jan 2018: Total (rough est.) Commits of non-ibm Repos:", total_commits)
+
+total_repos <- ibm_commits %>% filter(!is_ibm) %>% summarise(n_distinct(repo))
+paste("Jan 2018: Total (rough est.) Commits of non-ibm Repos:", total_repos)
+
+total_orgs <- ibm_commits %>% filter(!is_ibm) %>% summarise(n_distinct(org))
+paste("Jan 2018: Total (rough est.) Commits of non-ibm Repo Owners:", total_orgs)
+
+total_authors <- ibm_commits %>% filter(!is_ibm) %>% summarise(n_distinct(items.author.login))
+paste("Jan 2018: Total (rough est.) Unique Authors:", total_authors)
 
 ```
 
@@ -97,10 +114,7 @@ ibm_commits_orgs <- ibm_commits %>%
     num_repos = n_distinct(repo),
     num_authors = n_distinct(items.author.login),
     num_committers = sum(is_committer),
-    pct_committers = num_committers/num_authors) %>%
-  mutate(
-    is_ibm = str_detect(org, "[Ii][Bb][Mm]")
-  )
+    pct_committers = num_committers/num_authors)
 
 ```
 
@@ -123,7 +137,8 @@ ggplot(ibm_commits_author_check_join %>% filter(author_diff > 0), aes(x=reorder(
   geom_bar(stat="identity") +
   coord_flip() +
   theme_few() +
-  labs(x="Repository Owner", y="Unique Authors - Authors w/ IBM in email", title="January 2018 - IBM Unique Authors Check")
+  labs(x="Repository Owner", y="Difference: Unique Authors - Authors w/ IBM in email", 
+       title="January 2018 - IBM Unique Authors Check")
 
 ggsave("png/20180101_ibm_author_check.png")
 
@@ -131,12 +146,11 @@ ggsave("png/20180101_ibm_author_check.png")
 
 ```{r org_sums}
 
-total_commits <- ibm_commits_orgs %>% filter(!is_ibm) %>% summarise(sum(total_commits))
+total_org_commits <- ibm_commits_orgs %>% filter(!is_ibm) %>% summarise(sum(total_commits))
 paste("Jan 2018: Total (rough est.) Commits of non-ibm Repos (by repo owner):", total_commits)
 
-total_authors <- ibm_commits_orgs %>% filter(!is_ibm) %>% summarise(sum(num_authors))
+total_org_authors <- ibm_commits_orgs %>% filter(!is_ibm) %>% summarise(sum(num_authors))
 paste("Jan 2018: Total (rough est.) Unique Authors per non-ibm Repo (by repo owner):", total_authors)
-
 
 ```
 
