@@ -44,12 +44,12 @@ commits_search_query <- "q=ibm.com+author-date:>2018-01-01"
 url <- paste(commits_search_url, commits_search_query, sep="?")
 
 commits_p1 <- get_gh_commits(url, append(query_params, c(page=1)))
-total_pages <- ceiling(search_results_p1$total_count[[1]]/100)
+total_pages <- ceiling(commits_p1$total_count[[1]]/100)
 
 commits <- as.data.frame(commits_p1)
 for (n in 2:total_pages) {
   print(paste("Getting commits for page:", n))
-  search_results <- get_gh_commits(url, append(query_params, c(page=n)))
+  search_result <- get_gh_commits(url, append(query_params, c(page=n)))
   commits <- bind_rows(commits, as.data.frame(search_result))
   saveRDS(commits, paste0("downloads/ibm_commits/_ibm_commits_", n, ".rds"))
 }
