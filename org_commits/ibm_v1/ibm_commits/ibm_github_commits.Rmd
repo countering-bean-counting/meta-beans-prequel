@@ -90,7 +90,7 @@ paste("Jan 2018: Total (rough est.) Commits of non-ibm Repos:", total_repos)
 total_orgs <- ibm_commits %>% filter(!is_ibm) %>% summarise(n_distinct(org))
 paste("Jan 2018: Total (rough est.) Commits of non-ibm Repo Owners:", total_orgs)
 
-total_authors <- ibm_commits %>% filter(!is_ibm) %>% summarise(n_distinct(items.author.login))
+total_authors <- ibm_commits %>% summarise(n_distinct(items.author.login))
 paste("Jan 2018: Total (rough est.) Unique Authors:", total_authors)
 
 ```
