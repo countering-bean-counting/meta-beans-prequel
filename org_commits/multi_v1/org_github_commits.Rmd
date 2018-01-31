@@ -8,7 +8,7 @@ params:
   gh_secret: !r Sys.getenv("API_KEY_GITHUB_SECRET")
 ---
 
-```{r includes}
+```{r includes, message=FALSE}
 library(dplyr)
 library(ggplot2)
 library(ggthemes)
@@ -88,11 +88,43 @@ amazon_commits <- search_gh_commits_by_company("amazon.com")
 
 ```
 
-```{r get_ibm_commits}
+```{r get_ibm_commits, eval=FALSE}
 
 ibm_commits <- search_gh_commits_by_company("ibm.com")
 
 ```
+
+```{r load_all_commits}
+
+# load raw commits from RDS
+load_commit_rds <- function(company_text) {
+  filename <- paste0("data/", company_text, "_commits.rds")
+  return(readRDS(filename))
+}
+
+commits = data_frame()
+for (org in c("amazon", "facebook", "google", "ibm", "microsoft")) {
+  commits_raw <- load_commit_rds(paste0(org, ".com"))
+  commits_filtered <- commits_raw %>% 
+    filter(str_detect(items.commit.author.email, org)) %>%
+    mutate(company=org) %>%
+    rename(repo=items.repository.name,
+           org=items.repository.owner.login) %>%
+    select(repo, org, 
+         items.sha, 
+         items.commit.message, items.commit.author.date, items.commit.author.email, items.commit.author.name,
+         items.commit.committer.date, items.commit.committer.email, items.commit.committer.name,
+         items.author.login, items.committer.login,
+         items.repository.full_name, items.repository.description,
+         company)
+  
+  commits <- bind_rows(commits_filtered, commits)
+}
+
+saveRDS(commits, "commits.rds")
+
+```
+
 
 
 
