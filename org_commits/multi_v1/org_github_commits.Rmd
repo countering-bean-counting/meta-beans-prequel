@@ -225,6 +225,8 @@ ggsave("png/20180101_est_commits_top.png")
 
 ```
 
+Some projects have activity from multiple companies. What repositories were the companies committing to?
+
 
 ```{r multi_company_orgs}
 
@@ -256,19 +258,59 @@ ggplot(multi_company_summary, aes(x=repo_slug, y=num_authors, fill=company)) +
   geom_bar(stat="identity", position="dodge") +
   coord_flip() +
   theme_few() +
-  labs(x="Repository", y="Unique Authors", title="January 2018 - Est. Authors by Repo")
+  labs(x="Repository", y="Unique Authors", title="January 2018 - Est. Authors by Repo Slug")
 
-ggsave("png/20180101_est_authors_multi_repo.png")
+ggsave("png/20180101_est_authors_multi_repo_slug.png")
 
 ggplot(multi_company_summary, aes(x=repo_slug, y=total_commits, fill=company)) +
   geom_bar(stat="identity", position="dodge") +
   coord_flip() +
   theme_few() +
-  labs(x="Repository", y="Commits", title="January 2018 - Est. Commits by Project")
+  labs(x="Repository", y="Commits", title="January 2018 - Est. Commits by Repo Slug")
 
-ggsave("png/20180101_est_commits_multi_repo.png")
+ggsave("png/20180101_est_commits_multi_repo_slug.png")
 
 ```
 
+What repositories had multiple companies committing to them?
 
+```{r multi_company_repo}
+multi_company_summary <- multi_company_summary %>%
+  ungroup() %>%
+  group_by(repo_slug) %>%
+  mutate(
+    total_repo_companies = n()
+  )
+
+multi_repo_company <- commits %>% 
+  inner_join(multi_company_summary %>% filter(total_repo_companies > 1), by=c("org", "repo", "company"))
+
+multi_repo_company_summary <- multi_repo_company %>%
+  group_by(repo, company) %>%
+  summarise(
+    total_commits = n(),
+    num_authors = n_distinct(items.author.login),
+    num_committers = sum(is_committer),
+    pct_committers = num_committers/num_authors)
+```
+
+
+```{r multi_company_repo_plot, fig.width=10, fig.height=30, message=FALSE}
+
+ggplot(multi_repo_company_summary, aes(x=repo, y=num_authors, fill=company)) +
+  geom_bar(stat="identity", position="dodge") +
+  coord_flip() +
+  theme_few() +
+  labs(x="Repository", y="Unique Authors", title="January 2018 - Est. Authors by Repo")
+
+ggsave("png/20180101_est_authors_multi_repo.png")
+
+ggplot(multi_repo_company_summary, aes(x=repo, y=total_commits, fill=company)) +
+  geom_bar(stat="identity", position="dodge") +
+  coord_flip() +
+  theme_few() +
+  labs(x="Repository", y="Commits", title="January 2018 - Est. Commits by Repo")
+
+ggsave("png/20180101_est_commits_multi_repo.png")
+```
 
