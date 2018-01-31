@@ -16,6 +16,7 @@ library(gh)
 library(httr)
 library(jsonlite)
 library(readr)
+library(reshape2)
 library(stringr)
 library(tidyr)
 ```
@@ -94,7 +95,7 @@ ibm_commits <- search_gh_commits_by_company("ibm.com")
 
 ```
 
-```{r load_all_commits}
+```{r load_all_commits, eval=FALSE}
 
 # load raw commits from RDS
 load_commit_rds <- function(company_text) {
@@ -121,57 +122,50 @@ for (org in c("amazon", "facebook", "google", "ibm", "microsoft")) {
   commits <- bind_rows(commits_filtered, commits)
 }
 
-saveRDS(commits, "commits.rds")
+saveRDS(commits, "data/commits.rds")
 
 ```
 
+```{r commits_summary_stats, message=FALSE}
 
+commits <- readRDS("data/commits.rds")
 
-
-
-
-```{r ibm_commits}
-
-ibm_commits <- readRDS("data/ibm_commits.rds")
-
-ibm_commits <- ibm_commits %>%
-  filter(! is.na(total_count)) %>%
-  rename(repo=items.repository.name,
-         org=items.repository.owner.login) %>%
-  select(repo, org, 
-         items.sha, 
-         items.commit.message, items.commit.author.date, items.commit.author.email, items.commit.author.name,
-         items.commit.committer.date, items.commit.committer.email, items.commit.committer.name,
-         items.author.login, items.committer.login,
-         items.repository.full_name, items.repository.description) %>%
-  mutate(
-    is_committer=items.author.login==items.committer.login,
-    is_ibm = str_detect(org, "[Ii][Bb][Mm]")
+commits_sums <- commits %>%
+  group_by(company) %>%
+  summarise(
+    total_commits = n(),
+    total_repos = n_distinct(repo),
+    total_orgs = n_distinct(org),
+    total_authors = n_distinct(items.author.login)
   )
 
 ```
 
-```{r commits_sums}
+```{r commits_summary_stats_plot, message=FALSE, fig.width=10, fig.height=8}
 
-total_commits <- ibm_commits %>% filter(!is_ibm) %>% summarise(n())
-paste("Jan 2018: Total (rough est.) Commits of non-ibm Repos:", total_commits)
+commits_sums_melt <- commits_sums %>% melt()
 
-total_repos <- ibm_commits %>% filter(!is_ibm) %>% summarise(n_distinct(repo))
-paste("Jan 2018: Total (rough est.) Commits of non-ibm Repos:", total_repos)
+ggplot(commits_sums_melt, aes(x=company, y=value, fill=variable)) +
+  geom_bar(stat="identity", position="dodge") +
+  coord_flip() +
+  theme_few() +
+  labs(x="Company", y="Beans Counted", title="January 2018: Commits Identified by Email Domain")
 
-total_orgs <- ibm_commits %>% filter(!is_ibm) %>% summarise(n_distinct(org))
-paste("Jan 2018: Total (rough est.) Commits of non-ibm Repo Owners:", total_orgs)
-
-total_authors <- ibm_commits %>% summarise(n_distinct(items.author.login))
-paste("Jan 2018: Total (rough est.) Unique Authors:", total_authors)
+ggsave("png/20180101_company_beans.png")
 
 ```
 
 
+
+
+
 ```{r repo_summary}
 
-ibm_commits_repos <- ibm_commits %>%
-  group_by(repo) %>%
+commits <- commits %>%
+  mutate(is_committer = items.author.login == items.committer.login)
+
+commits_repos <- commits %>%
+  group_by(company, repo) %>%
   summarise(
     org=first(org),
     total_commits = n(),
@@ -179,74 +173,102 @@ ibm_commits_repos <- ibm_commits %>%
     num_committers = sum(is_committer),
     pct_committers = num_committers/num_authors)
 
-ibm_commits_orgs <- ibm_commits %>%
-  group_by(org) %>%
+commits_orgs <- commits %>%
+  group_by(company, org) %>%
   summarise( 
     total_commits = n(),
     num_repos = n_distinct(repo),
     num_authors = n_distinct(items.author.login),
     num_committers = sum(is_committer),
-    pct_committers = num_committers/num_authors,
-    is_ibm = first(is_ibm))
+    pct_committers = num_committers/num_authors)
 
 ```
 
 
-```{r author_check, message=FALSE}
+```{r org_plot, fig.width=10, fig.height=30, message=FALSE}
 
-ibm_commits_author_check <- ibm_commits %>%
-  filter(str_detect(items.commit.author.email, "ibm")) %>%
+ggplot(commits_orgs, aes(x=reorder(org, num_authors), y=num_authors, fill=company)) +
+  geom_bar(stat="identity", position="dodge") +
+  coord_flip() +
+  theme_few() +
+  labs(x="Repository Owner", y="Unique Authors", title="January 2018 - Est. Authors by Project")
+
+ggsave("png/20180101_est_authors.png")
+
+ggplot(commits_orgs, aes(x=reorder(org, total_commits), y=total_commits, fill=company)) +
+  geom_bar(stat="identity", position="dodge") +
+  coord_flip() +
+  theme_few() +
+  labs(x="Repository Owner", y="Commits", title="January 2018 - Est. Commits by Project")
+
+ggsave("png/20180101_est_commits.png")
+
+```
+
+```{r org_plot_top, message=FALSE, fig.width=10, fig.height=20}
+
+ggplot(commits_orgs %>% filter(num_authors > 1), aes(x=reorder(org, num_authors), y=num_authors, fill=company)) +
+  geom_bar(stat="identity", position="dodge") +
+  coord_flip() +
+  theme_few() +
+  labs(x="Repository Owner", y="Unique Authors", title="January 2018 - Est. Authors by Project (>1)")
+
+ggsave("png/20180101_est_authors_top.png")
+
+ggplot(commits_orgs %>% filter(num_authors > 1), aes(x=reorder(org, total_commits), y=total_commits, fill=company)) +
+  geom_bar(stat="identity", position="dodge") +
+  coord_flip() +
+  theme_few() +
+  labs(x="Repository Owner", y="Commits", title="January 2018 - Est. Commits by Project (>1 Author)")
+
+ggsave("png/20180101_est_commits_top.png")
+
+```
+
+
+```{r multi_company_orgs}
+
+commits_orgs <- commits_orgs %>%
+  ungroup() %>%
   group_by(org) %>%
-  summarise(
-    num_authors_ibm_check = n_distinct(items.author.login)
+  mutate(
+    total_companies = n()
   )
 
-ibm_commits_author_check_join <- ibm_commits_author_check %>% full_join(ibm_commits_orgs %>% select(org, num_authors))
+multi_company <- commits %>% 
+  inner_join(commits_orgs %>% filter(total_companies > 1), by=c("org", "company"))
 
-ibm_commits_author_check_join <- ibm_commits_author_check_join %>% 
-  mutate(author_diff=num_authors-num_authors_ibm_check)
-
-ggplot(ibm_commits_author_check_join %>% filter(author_diff > 0), aes(x=reorder(org, author_diff), y=author_diff)) +
-  geom_bar(stat="identity") +
-  coord_flip() +
-  theme_few() +
-  labs(x="Repository Owner", y="Difference: Unique Authors - Authors w/ IBM in email", 
-       title="January 2018 - IBM Unique Authors Check")
-
-ggsave("png/20180101_ibm_author_check.png")
-
-```
-
-```{r org_sums}
-
-total_org_commits <- ibm_commits_orgs %>% filter(!is_ibm) %>% summarise(sum(total_commits))
-paste("Jan 2018: Total (rough est.) Commits of non-ibm Repos (by repo owner):", total_commits)
-
-total_org_authors <- ibm_commits_orgs %>% filter(!is_ibm) %>% summarise(sum(num_authors))
-paste("Jan 2018: Total (rough est.) Unique Authors per non-ibm Repo (by repo owner):", total_authors)
+multi_company_summary <- multi_company %>%
+  group_by(org, repo, company) %>%
+  summarise(
+    repo_slug = first(items.repository.full_name),
+    total_commits = n(),
+    num_authors = n_distinct(items.author.login),
+    num_committers = sum(is_committer),
+    pct_committers = num_committers/num_authors)
+  
 
 ```
 
-```{r org_plot, fig.width=8, fig.height=20}
+```{r multi_company_plot, fig.width=10, fig.height=30, message=FALSE}
 
-ggplot(ibm_commits_orgs, aes(x=reorder(org, num_authors), y=num_authors, fill=is_ibm)) +
-  geom_bar(stat="identity") +
+ggplot(multi_company_summary, aes(x=repo_slug, y=num_authors, fill=company)) +
+  geom_bar(stat="identity", position="dodge") +
   coord_flip() +
   theme_few() +
-  labs(x="Repository Owner", y="Unique Authors", title="January 2018 - Est. IBM Authors")
+  labs(x="Repository", y="Unique Authors", title="January 2018 - Est. Authors by Repo")
 
-ggsave("png/20180101_est_ibm_authors.png")
+ggsave("png/20180101_est_authors_multi_repo.png")
 
-ggplot(ibm_commits_orgs, aes(x=reorder(org, total_commits), y=total_commits, fill=is_ibm)) +
-  geom_bar(stat="identity") +
+ggplot(multi_company_summary, aes(x=repo_slug, y=total_commits, fill=company)) +
+  geom_bar(stat="identity", position="dodge") +
   coord_flip() +
   theme_few() +
-  labs(x="Repository Owner", y="Commits", title="January 2018 - Est. IBM Commits")
+  labs(x="Repository", y="Commits", title="January 2018 - Est. Commits by Project")
 
-ggsave("png/20180101_est_ibm_commits.png")
+ggsave("png/20180101_est_commits_multi_repo.png")
 
 ```
-
 
 
 
